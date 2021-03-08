@@ -996,7 +996,7 @@ static struct ref_iterator_vtable git_reftable_reflog_ref_iterator_vtable = {
 static struct ref_iterator *
 git_reftable_reflog_iterator_begin(struct ref_store *ref_store)
 {
-	struct git_reftable_reflog_ref_iterator *ri = xcalloc(sizeof(*ri), 1);
+	struct git_reftable_reflog_ref_iterator *ri = xcalloc(1, sizeof(*ri));
 	struct git_reftable_ref_store *refs =
 		(struct git_reftable_ref_store *)ref_store;
 
