@@ -1174,18 +1174,17 @@ static int run_rewrite_hook(const struct object_id *oldoid,
 }
 
 void commit_post_rewrite(struct repository *r,
-			 const struct commit *old_head,
+			 const struct object_id *old_head,
 			 const struct object_id *new_head)
 {
 	struct notes_rewrite_cfg *cfg;
 
 	cfg = init_copy_notes_for_rewrite("amend");
 	if (cfg) {
-		/* we are amending, so old_head is not NULL */
-		copy_note_for_rewrite(cfg, &old_head->object.oid, new_head);
+		copy_note_for_rewrite(cfg, old_head, new_head);
 		finish_copy_notes_for_rewrite(r, cfg, "Notes added by 'git commit --amend'");
 	}
-	run_rewrite_hook(&old_head->object.oid, new_head);
+	run_rewrite_hook(old_head, new_head);
 }
 
 static int run_prepare_commit_msg_hook(struct repository *r,
@@ -1537,7 +1536,7 @@ static int try_to_commit(struct repository *r,
 
 	run_commit_hook(0, 1, r->index_file, "post-commit", NULL);
 	if (flags & AMEND_MSG)
-		commit_post_rewrite(r, current_head, oid);
+		commit_post_rewrite(r, &current_head->object.oid, oid);
 
 out:
 	free_commit_extra_headers(extra);
@@ -3468,7 +3467,10 @@ static int do_exec(struct repository *r, const char *command_line)
 {
 	struct strvec child_env = STRVEC_INIT;
 	const char *child_argv[] = { NULL, NULL };
-	int dirty, status;
+	int dirty, status, bad_head;
+	struct object_id old_head_oid, new_head_oid;
+
+	bad_head = get_oid("HEAD", &old_head_oid);
 
 	fprintf(stderr, _("Executing: %s\n"), command_line);
 	child_argv[0] = command_line;
@@ -3477,6 +3479,11 @@ static int do_exec(struct repository *r, const char *command_line)
 		     absolute_path(get_git_work_tree()));
 	status = run_command_v_opt_cd_env(child_argv, RUN_USING_SHELL, NULL,
 					  child_env.v);
+
+	bad_head |= get_oid("HEAD", &new_head_oid);
+
+	if (!bad_head && !oideq(&old_head_oid, &new_head_oid))
+		commit_post_rewrite(r, &old_head_oid, &new_head_oid);
 
 	/* force re-reading of the cache */
 	if (discard_index(r->index) < 0 || repo_read_index(r) < 0)
